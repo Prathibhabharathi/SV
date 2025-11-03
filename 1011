@@ -1,0 +1,85 @@
+
+module fsm(
+  input  logic clk,
+  input  logic reset,
+  input  logic x,
+  output logic z
+);
+
+  typedef enum logic [3:0] {A, B, C, D} state_t;
+  state_t currentstate, nextstate;
+
+ 
+  always_ff @(posedge clk) begin
+    if (reset)
+      currentstate <= A;
+    else
+      currentstate <= nextstate;
+  end
+
+  
+  always_comb begin
+    case (currentstate)
+      A: nextstate = (x) ? B : A;
+      B: nextstate = (x) ? B : C;
+      C: nextstate = (x) ? D : A;
+      D: nextstate = (x) ? A : C;
+      default: nextstate = A;
+    endcase
+  end
+
+ 
+  assign z = (currentstate == C || currentstate == D);
+
+endmodule
+
+
+
+
+// Code your testbench here
+// or browse Examples
+
+      module fsm_tb;
+  logic clk;
+  logic reset;
+  logic x;
+  logic z;
+
+  
+  fsm dut (
+    .clk(clk),
+    .reset(reset),
+    .x(x),
+    .z(z)
+  );
+
+ 
+  initial clk = 0;
+  always #5 clk = ~clk;
+
+  
+  initial begin
+    $display("Time\tReset\tX\tZ\tState");
+    $monitor("%0t\t%b\t%b\t%b\t%s", $time, reset, x, z, dut.currentstate.name());
+
+   
+    reset = 1;
+    x = 0;
+    #10;
+
+   
+    reset = 0;
+
+   
+    repeat (2) @(posedge clk); x = 1;
+    repeat (2) @(posedge clk); x = 0;
+    repeat (2) @(posedge clk); x = 1;
+    repeat (2) @(posedge clk); x = 0;
+
+    #20;
+    $finish;
+  end
+endmodule
+
+
+        
