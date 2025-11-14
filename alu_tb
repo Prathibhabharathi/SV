@@ -1,0 +1,238 @@
+`timescale 1ns / 1ps
+//////////////////////////////////////////////////////////////////////////////////
+// Company: 
+// Engineer: 
+// 
+// Create Date: 12.11.2025 16:40:27
+// Design Name: 
+// Module Name: tb_top
+// Project Name: 
+// Target Devices: 
+// Tool Versions: 
+// Description: 
+// 
+// Dependencies: 
+// 
+// Revision:
+// Revision 0.01 - File Created
+// Additional Comments:
+// 
+//////////////////////////////////////////////////////////////////////////////////
+
+
+
+
+/////interface
+interface intf();
+  logic [7:0] a, b;
+  logic enable;
+  logic [3:0] command;
+  logic [15:0] out;
+endinterface
+/////transaction
+class transaction;
+  rand logic [7:0] a, b;
+  rand logic enable;
+  rand logic [3:0] command;
+  logic [15:0] out;
+
+  function void display(string name);
+    $display("%s", name);
+    $display("enable=%0d, command=%0d, a=%0d, b=%0d, output=%0d", enable, command, a, b, out);
+  endfunction
+endclass
+////mailbox
+class mailbox_class;
+  mailbox gen2driv;
+  transaction trans;
+
+  function new(transaction trans, mailbox gen2driv);
+    this.gen2driv = gen2driv;
+    this.trans = trans;
+  endfunction
+
+  task main();
+    repeat (1) begin
+      trans.display("mailbox");
+    end
+  endtask
+endclass
+/////generator
+class generator;
+  transaction trans;
+  mailbox gen2driv;
+
+  function new(mailbox gen2driv);
+    this.gen2driv = gen2driv;
+  endfunction
+
+  task main();
+    repeat (1) begin
+      trans = new();
+      trans.randomize();
+      trans.display("generator");
+      gen2driv.put(trans);
+    end
+  endtask
+endclass
+/////driver
+class driver;
+  virtual intf vif;
+  mailbox gen2driv;
+
+  function new(virtual intf vif, mailbox gen2driv);
+    this.vif = vif;
+    this.gen2driv = gen2driv;
+  endfunction
+
+  task main();
+    repeat (1) begin
+      transaction trans;
+      gen2driv.get(trans);
+      vif.a <= trans.a;
+      vif.b <= trans.b;
+      vif.enable <= trans.enable;
+      vif.command <= trans.command;
+      #1; // wait for output
+      trans.out = vif.out;
+      trans.display("driver");
+    end
+  endtask
+endclass
+/////monitor
+class monitor;
+  virtual intf vif;
+  mailbox mon2scb;
+
+  function new(virtual intf vif, mailbox mon2scb);
+    this.vif = vif;
+    this.mon2scb = mon2scb;
+  endfunction
+
+  task main();
+    repeat (1) begin
+      transaction trans = new(); // Allocate memory for the transaction object
+      trans.a        = vif.a;
+      trans.b        = vif.b;
+      trans.enable   = vif.enable;
+      trans.command  = vif.command;
+      trans.out      = vif.out;
+      trans.display("monitor");
+      mon2scb.put(trans);
+    end
+  endtask
+endclass
+
+///// scoreboard
+class scoreboard;
+  transaction trans;
+  mailbox mon2scb;
+  localparam add=4'b0000,sub=4'b0001,mul=4'b0010,div=4'b0011,inv=4'b0100,inc=4'b0101,dec=4'b0110,shl=4'b0111,shr=4'b1000,AND=4'b1001,OR=4'b1010,NAND=4'b1011,NOR=4'b1100,XOR=4'b1101,XNOR=4'b1110,mod=4'b1111;
+  logic [15:0]y;
+  string p;
+  
+  function new(mailbox mon2scb);
+    this.mon2scb = mon2scb;
+  endfunction
+  task main;
+    repeat(1)
+      begin
+        
+        trans.display("scoreboard");
+        mon2scb.get(trans);
+        if(trans.enable)
+          begin
+            case(trans.command)
+             add:y= trans.a+trans.b;
+      sub:y= trans.a-trans.b;
+      mul:y= trans.a*trans.b;
+      div:y= trans.a/trans.b;
+      inv:y= ~trans.a;
+      inc:y= trans.b+1;
+      dec:y= trans.b-1;
+      shl:y= trans.a<<1;
+      shr:y= trans.a>>1;
+      AND:y= trans.a & trans.b;
+      OR:y= trans.a|trans.b;
+              NAND:y= ~(trans.a & trans.b);
+              NOR:y= ~(trans.a|trans.b);
+      XOR:y= trans.a ^ trans.b;
+      XNOR:y= trans.a ~^ trans.b;
+              mod:y= trans.a % trans.b;
+            endcase
+        end
+        else y= 16'bz;
+        if(y=== trans.out)
+          p = "test pass";
+        else
+          p ="test fail";
+        trans.out = y;
+        trans.display ({"scoreboard",p});
+      end
+        
+  endtask
+ endclass
+
+
+
+//////environment
+class environment;
+  generator gen;
+  driver driv;
+  monitor mon;
+  scoreboard scb;
+  mailbox m1;
+  mailbox m2;
+  virtual intf vif;
+
+  function new(virtual intf vif);
+    this.vif = vif;
+    m1 = new();
+    m2 = new();
+    gen = new(m1);
+    driv = new(vif, m1);
+    mon = new(vif, m2);
+    scb = new(m2);
+  endfunction
+
+  task test();
+    fork
+      gen.main();
+      driv.main();
+      mon.main();
+      scb.main();
+    join
+  endtask
+
+  task run;
+    test();
+    $finish;
+  endtask
+endclass
+
+
+
+
+/////test
+program test(intf i_intf);
+  environment env;
+  initial begin
+    env = new(i_intf);
+    env.run();
+  end
+endprogram
+
+
+///testbench
+module tb_top();
+  intf i_intf();
+  test t1(i_intf);
+
+  alu dut (
+    .a(i_intf.a),
+    .b(i_intf.b),
+    .enable(i_intf.enable),
+    .command(i_intf.command),
+    .out(i_intf.out)
+  );
+endmodule
