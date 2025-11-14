@@ -1,0 +1,70 @@
+`timescale 1ns / 1ps
+//////////////////////////////////////////////////////////////////////////////////
+// Company: 
+// Engineer: 
+// 
+// Create Date: 12.11.2025 16:38:26
+// Design Name: 
+// Module Name: alu
+// Project Name: 
+// Target Devices: 
+// Tool Versions: 
+// Description: 
+// 
+// Dependencies: 
+// 
+// Revision:
+// Revision 0.01 - File Created
+// Additional Comments:
+// 
+//////////////////////////////////////////////////////////////////////////////////
+
+
+module alu (
+  input [7:0] a, b,
+  input enable,
+  input [3:0] command,
+  output reg [15:0] out
+);
+
+  parameter add  = 4'b0000,
+            sub  = 4'b0001,
+            mul  = 4'b0010,
+            div  = 4'b0011,
+            inv  = 4'b0100,
+            inc  = 4'b0101,
+            dec  = 4'b0110,
+            shl  = 4'b0111,
+            shr  = 4'b1000,
+            AND  = 4'b1001,
+            OR   = 4'b1010,
+            NAND = 4'b1011,
+            NOR  = 4'b1100,
+            XOR  = 4'b1101,
+            XNOR = 4'b1110,
+            mod  = 4'b1111;
+
+  always @(*) begin
+    case (command)
+      add:  out = a + b;
+      sub:  out = a - b;
+      mul:  out = a * b;
+      div:  out = b != 0 ? a / b : 16'hXXXX; // optional divide-by-zero guard
+      inv:  out = ~a;
+      inc:  out = b + 1;
+      dec:  out = b - 1;
+      shl:  out = a << 1;
+      shr:  out = a >> 1;
+      AND:  out = a & b;
+      OR:   out = a | b;
+      NAND: out = ~(a & b);
+      NOR:  out = ~(a | b);
+      XOR:  out = a ^ b;
+      XNOR: out = a ~^ b;
+      mod:  out = b != 0 ? a % b : 16'hXXXX; // optional mod-by-zero guard
+      default: out = 16'hZZZZ;
+    endcase
+  end
+
+endmodule
+alu
